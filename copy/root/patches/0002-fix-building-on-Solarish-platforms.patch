@@ -1,0 +1,176 @@
+From 3b927f4cce1e7a2f1c491b47bc7f23c7e4d6871c Mon Sep 17 00:00:00 2001
+From: Petri Pyy <f******k@gmail.com>
+Date: Sun, 27 Mar 2016 19:48:11 +0300
+Subject: [PATCH] fix building on Solarish platforms
+
+---
+ common/obj-backend-fs.c |  4 ++--
+ daemon/repo-mgr.c       | 10 +++++-----
+ daemon/vc-utils.c       |  6 +++---
+ lib/utils.c             | 10 ++++++++--
+ server/gc/seaf-fsck.c   |  6 +++---
+ 5 files changed, 21 insertions(+), 15 deletions(-)
+
+diff --git a/common/obj-backend-fs.c b/common/obj-backend-fs.c
+index e0c5619..7a4ea28 100644
+--- a/common/obj-backend-fs.c
++++ b/common/obj-backend-fs.c
+@@ -101,7 +101,7 @@ obj_backend_fs_read (ObjBackend *bend,
+ static int
+ fsync_obj_contents (int fd)
+ {
+-#ifdef __linux__
++#if defined(__linux__) || defined(__SVR4) || defined(__sun)
+     /* Some file systems may not support fsync().
+      * In this case, just skip the error.
+      */
+@@ -153,7 +153,7 @@ fsync_obj_contents (int fd)
+ static int
+ rename_and_sync (const char *tmp_path, const char *obj_path)
+ {
+-#ifdef __linux__
++#if defined(__linux__) || defined(__SVR4) || defined(__sun)
+     char *parent_dir;
+     int ret = 0;
+ 
+diff --git a/daemon/repo-mgr.c b/daemon/repo-mgr.c
+index 3b21703..6d7217d 100644
+--- a/daemon/repo-mgr.c
++++ b/daemon/repo-mgr.c
+@@ -4109,7 +4109,7 @@ checkout_file (const char *repo_id,
+     gboolean force_conflict = FALSE;
+     gboolean update_mode_only = FALSE;
+ 
+-#ifndef __linux__
++#if !defined(__linux__) && !defined(__SVR4) && !defined(__sun)
+     path = build_case_conflict_free_path (worktree, name,
+                                           conflict_hash, no_conflict_hash,
+                                           &case_conflict,
+@@ -4285,7 +4285,7 @@ checkout_empty_dir (const char *worktree,
+     char *path;
+     gboolean case_conflict = FALSE;
+ 
+-#ifndef __linux__
++#if !defined(__linux__) && !defined(__SVR4) && !defined(__sun)
+     path = build_case_conflict_free_path (worktree, name,
+                                           conflict_hash, no_conflict_hash,
+                                           &case_conflict,
+@@ -4699,7 +4699,7 @@ schedule_file_fetch (GThreadPool *tpool,
+         new_ce = TRUE;
+     }
+ 
+-#ifndef __linux__
++#if !defined(__linux__) && !defined(__SVR4) && !defined(__sun)
+     gboolean case_conflict = FALSE;
+     path = build_case_conflict_free_path (worktree, de->name,
+                                           conflict_hash, no_conflict_hash,
+@@ -4844,7 +4844,7 @@ checkout_file_http (FileTxData *data,
+      * A.txt to checkout, we can only detect case conflict after one file is checkecd
+      * out. So we need to generate a new one here.
+      */
+-#ifndef __linux__
++#if !defined(__linux__) && !defined(__SVR4) && !defined(__sun)
+     path = build_case_conflict_free_path (worktree, de->name,
+                                           conflict_hash, no_conflict_hash,
+                                           &case_conflict,
+@@ -5214,7 +5214,7 @@ do_rename_in_worktree (DiffEntry *de, const char *worktree,
+     old_path = g_build_filename (worktree, de->name, NULL);
+ 
+     if (seaf_util_exists (old_path)) {
+-#ifndef __linux__
++#if !defined(__linux__) && !defined(__SVR4) && !defined(__sun)
+         gboolean case_conflict;
+         new_path = build_case_conflict_free_path (worktree, de->new_name,
+                                                   conflict_hash, no_conflict_hash,
+diff --git a/daemon/vc-utils.c b/daemon/vc-utils.c
+index a9e0f6f..4724ebe 100644
+--- a/daemon/vc-utils.c
++++ b/daemon/vc-utils.c
+@@ -664,7 +664,7 @@ error:
+ 
+ #endif  /* defined WIN32 || defined __APPLE__ */
+ 
+-#ifdef __linux__
++#if defined(__linux__) || defined(__SVR4) || defined(__sun)
+ 
+ char *
+ build_checkout_path (const char *worktree, const char *ce_name, int len)
+@@ -707,7 +707,7 @@ build_checkout_path (const char *worktree, const char *ce_name, int len)
+     return g_strdup(path);
+ }
+ 
+-#endif  /* __linux__ */
++#endif  /* defined(__linux__) || defined(__SVR4) || defined(__sun) */
+ 
+ static int
+ checkout_entry (struct cache_entry *ce,
+@@ -724,7 +724,7 @@ checkout_entry (struct cache_entry *ce,
+     gboolean force_conflict = FALSE;
+ 
+     path_in = g_build_path ("/", o->base, ce->name, NULL);
+-#ifndef __linux__
++#if !defined(__linux__) && !defined(__SVR4) && !defined(__sun)
+     path = build_case_conflict_free_path (o->base, ce->name,
+                                           conflict_hash, no_conflict_hash,
+                                           &case_conflict,
+diff --git a/lib/utils.c b/lib/utils.c
+index 4fbe1ef..4a5206a 100644
+--- a/lib/utils.c
++++ b/lib/utils.c
+@@ -2161,14 +2161,20 @@ wchar_from_utf8 (const char *utf8)
+ 
+ #endif  /* ifdef WIN32 */
+ 
+-#ifdef __linux__
++#if defined(__linux__) || defined(__SVR4) || defined(__sun)
++
++#if defined(__SVR4) || defined(__sun)
++const char *processpath = "/proc/%s/object/a.out";
++#else
++const char *processpath = "/proc/%s/exe";
++#endif
+ /* read the link of /proc/123/exe and compare with `process_name' */
+ static int
+ find_process_in_dirent(struct dirent *dir, const char *process_name)
+ {
+     char path[512];
+     /* fisrst construct a path like /proc/123/exe */
+-    if (sprintf (path, "/proc/%s/exe", dir->d_name) < 0) {
++    if (sprintf (path, processpath, dir->d_name) < 0) {
+         return -1;
+     }
+ 
+diff --git a/server/gc/seaf-fsck.c b/server/gc/seaf-fsck.c
+index 8a1e437..a4a45e1 100644
+--- a/server/gc/seaf-fsck.c
++++ b/server/gc/seaf-fsck.c
+@@ -61,7 +61,7 @@ get_argv_utf8 (int *argc)
+ }
+ #endif
+ 
+-#ifdef __linux__
++#if defined(__linux__) || defined(__SVR4) || defined(__sun)
+ 
+ /* Compare the owner uid of the seafile-data dir with the current uid. */
+ static gboolean
+@@ -84,7 +84,7 @@ check_user (const char *seafile_dir, uid_t *current_user, uid_t *seafile_user)
+     return (euid == st.st_uid);
+ }
+ 
+-#endif  /* __linux__ */
++#endif  /* defined(__linux__) || defined(__SVR4) || defined(__sun) */
+ 
+ int
+ main(int argc, char *argv[])
+@@ -147,7 +147,7 @@ main(int argc, char *argv[])
+     if (seafile_dir == NULL)
+         seafile_dir = g_build_filename (config_dir, "seafile-data", NULL);
+ 
+-#ifdef __linux__
++#if defined(__linux__) || defined(__SVR4) || defined(__sun)
+     uid_t current_user, seafile_user;
+     if (!check_user (seafile_dir, &current_user, &seafile_user)) {
+         seaf_message ("Current user (%u) is not the user for running "
+-- 
+2.6.4 (Apple Git-63)
+

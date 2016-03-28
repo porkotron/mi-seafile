@@ -1,0 +1,8 @@
+name="seafile"
+organization="SmartOS"
+brand="SmartMachine"
+version="15.4.1"
+description="Cloud storage with client-side Encryption."
+homepage="https://github.com/porkotron/mi-seafile"
+users="root admin haiwen"
+base="088b97b0-e1a1-11e5-b895-9baa2086eb33"

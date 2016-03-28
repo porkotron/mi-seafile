@@ -1,0 +1,97 @@
+From b88288e11b7b1e29e29c7e98f1c3b374623a00d7 Mon Sep 17 00:00:00 2001
+From: Petri Pyy <f******k@gmail.com>
+Date: Sun, 27 Mar 2016 15:27:25 +0300
+Subject: [PATCH] fix building on Solarish platforms
+
+fix building on Solarish platforms
+---
+ common/cdc/rabin-checksum.c     |  2 +-
+ common/index/index.h            | 19 ++++++++++---------
+ controller/seafile-controller.c |  8 +++++++-
+ 3 files changed, 18 insertions(+), 11 deletions(-)
+
+diff --git a/common/cdc/rabin-checksum.c b/common/cdc/rabin-checksum.c
+index 615b42e..24fb4d0 100644
+--- a/common/cdc/rabin-checksum.c
++++ b/common/cdc/rabin-checksum.c
+@@ -1,7 +1,7 @@
+ #include <sys/types.h>
+ #include "rabin-checksum.h"
+ 
+-#ifdef WIN32
++#if defined(WIN32) || defined(__SVR4) || defined(__sun)
+ #include <stdint.h>
+ #ifndef u_int
+ typedef unsigned int u_int;
+diff --git a/common/index/index.h b/common/index/index.h
+index 7c11e31..8101a0a 100644
+--- a/common/index/index.h
++++ b/common/index/index.h
+@@ -28,12 +28,6 @@
+ #include <winsock2.h>
+ #include <windows.h>   
+ 
+-#define DT_UNKNOWN 0
+-#define DT_DIR     1
+-#define DT_REG     2
+-#define DT_LNK     3
+-#define DTYPE(de)    DT_UNKNOWN
+-
+ #define S_IFLNK    0120000 /* Symbolic link */
+ #define S_ISLNK(x) (((x) & S_IFMT) == S_IFLNK)
+ #define S_ISSOCK(x) 0
+@@ -58,15 +52,22 @@ extern int git_munmap(void *start, size_t length);
+     #include <arpa/inet.h>
+     #include <netdb.h>
+     #include <sys/mman.h>
+-
+-#define DTYPE(de)    ((de)->d_type)
+-
+ #endif
+ 
+ #ifndef O_BINARY
+ #define O_BINARY 0
+ #endif
+ 
++#if defined(WIN32) || defined(__SVR4) || defined(__sun)
++#define DT_UNKNOWN 0
++#define DT_DIR     1
++#define DT_REG     2
++#define DT_LNK     3
++#define DTYPE(de)    DT_UNKNOWN    
++#else
++#define DTYPE(de)    ((de)->d_type)
++#endif
++
+ /* unknown mode (impossible combination S_IFIFO|S_IFCHR) */
+ #define S_IFINVALID     0030000
+ 
+diff --git a/controller/seafile-controller.c b/controller/seafile-controller.c
+index 7cf9dd4..8fc97d0 100644
+--- a/controller/seafile-controller.c
++++ b/controller/seafile-controller.c
+@@ -21,6 +21,12 @@
+ 
+ SeafileController *ctl;
+ 
++#if defined(__SVR4) || defined(__sun)
++    const char *selfpath = "/proc/self/path/a.out";
++#else
++    const char *selfpath = "/proc/self/exe";
++#endif
++
+ static char *controller_pidfile = NULL;
+ 
+ char *bin_dir = NULL;
+@@ -244,7 +250,7 @@ static void
+ init_seafile_path ()
+ {
+     GError *error = NULL;
+-    char *executable = g_file_read_link ("/proc/self/exe", &error);
++    char *executable = g_file_read_link (selfpath, &error);
+     char *tmp = NULL;
+     if (error != NULL) {
+         seaf_warning ("failed to readlink: %s\n", error->message);
+-- 
+2.6.4 (Apple Git-63)
+

@@ -1,0 +1,35 @@
+From 75efbb53e5f7ac144b298b68909b0e9e92922476 Mon Sep 17 00:00:00 2001
+From: Petri Pyy <f******k@gmail.com>
+Date: Sun, 27 Mar 2016 16:25:31 +0300
+Subject: [PATCH] fix for django 1.8
+
+---
+ tools/seafile-admin | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/tools/seafile-admin b/tools/seafile-admin
+index 2c41a2b..c173405 100755
+--- a/tools/seafile-admin
++++ b/tools/seafile-admin
+@@ -520,7 +520,7 @@ def init_seahub():
+ def check_django_version():
+     '''Requires django 1.5'''
+     import django
+-    if django.VERSION[1] != 5:
++    if django.VERSION[1] < 5:
+         error('Django 1.5 is required')
+     else:
+         del django
+@@ -668,7 +668,8 @@ def start_controller():
+ 
+ def start_seahub_gunicorn():
+     argv = [
+-        'gunicorn_django',
++        'gunicorn',
++        'seahub.wsgi:application',
+         '-c',
+         conf[CONF_SEAHUB_CONF],
+         '-b',
+-- 
+2.6.4 (Apple Git-63)
+
